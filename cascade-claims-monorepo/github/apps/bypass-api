@@ -1,1 +1,19 @@
+const express = require('express');
+const { GeicoBypass } = require('@cascade/automation-engine');
+const app = express();
 
+app.post('/v1/submit-claim', async (req, res) => {
+    const claimData = req.body;
+    const engine = new GeicoBypass();
+    
+    // Trigger the bot in the background
+    const result = await engine.execute(claimData);
+    
+    if(result.success) {
+        res.status(200).json({ message: "Bypass Successful", ref: result.referralId });
+    } else {
+        res.status(500).json({ error: "Bypass Blocked", details: result.error });
+    }
+});
+
+app.listen(3000, () => console.log('Claims API Live on Port 3000'));
