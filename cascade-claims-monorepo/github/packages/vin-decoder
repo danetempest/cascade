@@ -1,1 +1,15 @@
+import axios from 'axios';
 
+/**
+ * Connects to NHTSA (National Highway Traffic Safety Admin)
+ * This is a free government API to get car details automatically.
+ */
+export const decodeVin = async (vin) => {
+    const response = await axios.get(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`);
+    const data = response.data.Results;
+    return {
+        make: data.find(i => i.Variable === "Make").Value,
+        model: data.find(i => i.Variable === "Model").Value,
+        year: data.find(i => i.Variable === "Model Year").Value
+    };
+};
