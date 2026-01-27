@@ -1,1 +1,28 @@
+import React, { useState } from 'react';
 
+export const ClaimPortal = () => {
+    const [step, setStep] = useState(1);
+
+    return (
+        <div className="max-w-md mx-auto p-6 bg-slate-50 min-h-screen">
+            <header className="mb-8">
+                <h1 className="text-2xl font-black text-blue-900 uppercase">Cascade <span className="text-gray-400">Claims</span></h1>
+                <p className="text-sm text-gray-500 italic">Bypassing the corporate wait, since 2026.</p>
+            </header>
+
+            {step === 1 && (
+                <div className="space-y-4">
+                    <h2 className="font-bold text-xl">Vehicle Info</h2>
+                    <input className="w-full p-4 border rounded" placeholder="VIN Number" />
+                    <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white font-bold py-4 rounded shadow-lg">Next</button>
+                </div>
+            )}
+
+            <footer className="mt-12 p-4 bg-blue-50 rounded border border-blue-100">
+                <p className="text-xs text-blue-800 font-medium">
+                    🛡️ Idaho Code § 41-1329 Compliance: This tool assists in exercising your legal Right to Choose.
+                </p>
+            </footer>
+        </div>
+    );
+};
