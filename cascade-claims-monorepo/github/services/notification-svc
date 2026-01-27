@@ -1,1 +1,45 @@
+require('dotenv').config();
+const amqp = require('amqplib'); // For message queueing (RabbitMQ)
+const twilio = require('twilio');
 
+const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+const QUEUE_NAME = 'bypass_notifications';
+
+async function startService() {
+  // Connect to the internal message bus
+  const connection = await amqp.connect('amqp://localhost');
+  const channel = await connection.createChannel();
+  await channel.assertQueue(QUEUE_NAME, { durable: true });
+
+  console.log("Waiting for bypass success events...");
+
+  channel.consume(QUEUE_NAME, async (msg) => {
+    const data = JSON.parse(msg.content.toString());
+    
+    // THE SCRIPT: What the customer actually sees
+    const messageBody = `
+      ✅ CASCADE UPDATE: 
+      Great news, ${data.firstName}. We have successfully secured your claim 
+      with ${data.carrier}. 
+      
+      Referral #: ${data.refNumber}
+      
+      Your "Right to Choose" has been exercised. 
+      See you at your appointment!
+    `;
+
+    try {
+      await client.messages.create({
+        body: messageBody,
+        from: process.env.TWILIO_PHONE,
+        to: data.phone
+      });
+      console.log(`[SMS SENT] To: ${data.phone}`);
+      channel.ack(msg);
+    } catch (err) {
+      console.error("[SMS FAILED]", err);
+    }
+  });
+}
+
+startService();
