@@ -1,1 +1,47 @@
+import { chromium, Browser, Page } from 'playwright';
 
+/**
+ * GEICO BYPASS ENGINE v1.0
+ * Purpose: Automates the GEICO Glass Portal and forces independent shop selection.
+ */
+export class GeicoBypass {
+    async execute(claimData: any) {
+        const browser: Browser = await chromium.launch({ headless: true });
+        const context = await browser.newContext();
+        const page: Page = await context.newPage();
+
+        try {
+            await page.goto('https://www.geico.com/claims/glass/');
+            
+            // Phase 1: Authentication
+            await page.fill('input[name="policyNumber"]', claimData.policy);
+            await page.fill('input[name="lastName"]', claimData.lastName);
+            await page.click('#submit-policy');
+
+            // Phase 2: Anti-Steering Maneuver
+            // Detect if Safelite's TPA frame is trying to auto-select a shop
+            await page.waitForSelector('.selection-screen');
+            
+            // Bypass the "Preferred Provider" map
+            const otherShopLink = page.locator('text="I have a different shop in mind"');
+            if (await otherShopLink.isVisible()) {
+                await otherShopLink.click();
+                
+                // Input Cascade Auto Glass Details
+                await page.fill('#shop-name-search', 'Cascade Auto Glass');
+                await page.fill('#zip-code', '83704');
+                await page.click('#search-button');
+                
+                // Force Selection (Bypass Safelite overlays)
+                await page.click('button:has-text("Select Cascade Auto Glass")', { force: true });
+            }
+
+            const referralId = await page.innerText('.confirmation-number');
+            return { success: true, referralId };
+        } catch (error) {
+            return { success: false, error: error.message };
+        } finally {
+            await browser.close();
+        }
+    }
+}
