@@ -1,47 +1,62 @@
 import { chromium, Browser, Page } from 'playwright';
 
 /**
- * GEICO BYPASS ENGINE v1.0
- * Purpose: Automates the GEICO Glass Portal and forces independent shop selection.
+ * STATE FARM BYPASS ENGINE
+ * Difficulty: High (Uses LYNX Services redirection)
  */
-export class GeicoBypass {
-    async execute(claimData: any) {
-        const browser: Browser = await chromium.launch({ headless: true });
-        const context = await browser.newContext();
-        const page: Page = await context.newPage();
+export class StateFarmBypass {
+  async execute(claim: any) {
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
 
-        try {
-            await page.goto('https://www.geico.com/claims/glass/');
-            
-            // Phase 1: Authentication
-            await page.fill('input[name="policyNumber"]', claimData.policy);
-            await page.fill('input[name="lastName"]', claimData.lastName);
-            await page.click('#submit-policy');
+    try {
+      console.log(`[SF-BOT] Initiating claim for ${claim.lastName}`);
+      
+      // 1. State Farm Landing
+      await page.goto('https://www.statefarm.com/claims/file-a-claim');
+      await page.click('text="Glass only"');
 
-            // Phase 2: Anti-Steering Maneuver
-            // Detect if Safelite's TPA frame is trying to auto-select a shop
-            await page.waitForSelector('.selection-screen');
-            
-            // Bypass the "Preferred Provider" map
-            const otherShopLink = page.locator('text="I have a different shop in mind"');
-            if (await otherShopLink.isVisible()) {
-                await otherShopLink.click();
-                
-                // Input Cascade Auto Glass Details
-                await page.fill('#shop-name-search', 'Cascade Auto Glass');
-                await page.fill('#zip-code', '83704');
-                await page.click('#search-button');
-                
-                // Force Selection (Bypass Safelite overlays)
-                await page.click('button:has-text("Select Cascade Auto Glass")', { force: true });
-            }
+      // 2. The "Handshake" (They pass you to LYNX/Safelite Solutions)
+      // We must wait for the URL to change domains
+      await page.waitForURL(/.*lynxservices.*/, { timeout: 15000 });
+      console.log('[SF-BOT] Intercepted LYNX Portal Redirection');
 
-            const referralId = await page.innerText('.confirmation-number');
-            return { success: true, referralId };
-        } catch (error) {
-            return { success: false, error: error.message };
-        } finally {
-            await browser.close();
-        }
+      // 3. Data Entry
+      await page.fill('#policyNumber', claim.policyNumber);
+      await page.fill('#dateOfLoss', claim.dateOfLoss);
+
+      // 4. The Steering Trap
+      // State Farm often hides the "Select Shop" button under a "Program Shop" accordion.
+      // We force-expand it.
+      const nonProgramLink = page.locator('#select-non-program-shop');
+      if (await nonProgramLink.isVisible()) {
+         await nonProgramLink.click();
+      } else {
+         // Fallback: If link is hidden, inject Javascript to reveal it
+         await page.evaluate(() => {
+            document.querySelector('#hidden-choice-layer').style.display = 'block';
+         });
+         await page.click('#hidden-choice-layer a');
+      }
+
+      // 5. Hard-Code Cascade Auto Glass
+      await page.fill('input[aria-label="Shop Name"]', 'Cascade Auto Glass');
+      await page.fill('input[aria-label="Zip Code"]', '83704');
+      await page.keyboard.press('Enter');
+
+      // 6. Confirm "Out of Network" Warning (The scary popup)
+      // We programmatically click "I Understand" to dismiss the fear tactic
+      await page.click('button:has-text("I accept the terms")');
+
+      const claimId = await page.innerText('.claim-confirmation-header');
+      return { success: true, claimId };
+
+    } catch (err) {
+      // Take a "Crime Scene Photo" (Screenshot) so you can see why it failed
+      await page.screenshot({ path: `logs/errors/${claim.lastName}-error.png` });
+      return { success: false, error: err.message };
+    } finally {
+      await browser.close();
     }
+  }
 }
